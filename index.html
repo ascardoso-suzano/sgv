@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="notranslate" translate="no">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="google" content="notranslate">
 <title>SGV - Sistema de Gestão de Vazamentos</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
@@ -1492,17 +1491,21 @@ Nenhuma nota de manutenção registrada.
 
 <div id="consultaFotoContainer" class="field photo-consult hidden">
 
-<label>Foto</label>
+<label>Foto da Ocorrência</label>
 
-<img id="consultaFoto" alt="Foto da ocorrência">
+<img id="consultaFoto" alt="Foto da ocorrência" style="display:none; max-width:100%; max-height:350px; border-radius:8px; border:1px solid #ccc; margin-bottom:10px;">
 
-<div class="photo-actions">
+<div id="consultaSemFotoAviso" class="info-item" style="display:none; color:#777;">
+Nenhuma foto anexada a esta ocorrência.
+</div>
+
+<div id="consultaFotoBotoes" class="photo-actions" style="display:none;">
 
 <button
 type="button"
 class="btn-secondary"
 onclick="compartilharFotoConsulta()">
-Compartilhar foto
+Ver foto em tamanho real
 </button>
 
 <button
@@ -2124,6 +2127,11 @@ function limparTelaConsulta() {
     const boxHist = document.getElementById("historicoOcorrencia");
     if (boxHist) boxHist.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
 
+    const boxFoto = document.getElementById("consultaFotoContainer");
+    const imgFoto = document.getElementById("consultaFoto");
+    if (boxFoto) boxFoto.classList.add("hidden");
+    if (imgFoto) { imgFoto.src = ""; imgFoto.style.display = "none"; }
+
     ocorrenciaAtual = null;
 
     limparFiltros();
@@ -2342,19 +2350,21 @@ function atualizarLocais() {
     }
 }
 
-// --- GESTÃO DE IMAGENS COM COMPRESSÃO AUTOMÁTICA ---
+// --- GESTÃO DE IMAGENS COM COMPRESSÃO SEGURA ---
 function mostrarFotoPreview(input) {
     const previewBox = document.getElementById("fotoPreview");
     const imgPreview = document.getElementById("imagemPreview");
+    if (!input || !input.files || !input.files[0]) return;
 
-    if (input && input.files && input.files[0]) {
-        const file = input.files[0];
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                // Redimensiona para resolução ideal (máx 1280px) evitando travamentos no Android
-                const maxDim = 1280;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const rawResult = e.target.result;
+        const img = new Image();
+        img.onload = function() {
+            try {
+                // Comprime fotos pesadas para evitar lentidão e travamento no Android
+                const maxDim = 1200;
                 let w = img.width;
                 let h = img.height;
                 if (w > maxDim || h > maxDim) {
@@ -2371,15 +2381,21 @@ function mostrarFotoPreview(input) {
                 canvas.height = h;
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, w, h);
-                // Converte para JPEG com 75% de qualidade (gera ~250KB com ótima nitidez)
                 fotoBase64 = canvas.toDataURL("image/jpeg", 0.75);
-                imgPreview.src = fotoBase64;
-                previewBox.style.display = "block";
-            };
-            img.src = e.target.result;
+            } catch (err) {
+                fotoBase64 = rawResult;
+            }
+            if (imgPreview) imgPreview.src = fotoBase64;
+            if (previewBox) previewBox.style.display = "block";
         };
-        reader.readAsDataURL(file);
-    }
+        img.onerror = function() {
+            fotoBase64 = rawResult;
+            if (imgPreview) imgPreview.src = fotoBase64;
+            if (previewBox) previewBox.style.display = "block";
+        };
+        img.src = rawResult;
+    };
+    reader.readAsDataURL(file);
 }
 
 function removerFoto() {
@@ -2395,7 +2411,9 @@ function removerFoto() {
 function compartilharFoto() {
     if (!fotoBase64) return;
     const win = window.open("");
-    win.document.write(`<title>Foto da Ocorrência</title><img src="${fotoBase64}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+    if (win) {
+        win.document.write(`<title>Foto da Ocorrência</title><img src="${fotoBase64}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+    }
 }
 
 function baixarFoto() {
@@ -2407,19 +2425,21 @@ function baixarFoto() {
 }
 
 function compartilharFotoConsulta() {
-    const imgBruta = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
-    const imgUrl = normalizarDataUrl(imgBruta);
-    if (!imgUrl) return alert("Nenhuma foto disponível para visualização.");
+    const raw = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const url = normalizarDataUrl(raw);
+    if (!url) return alert("Nenhuma foto disponível para visualização.");
     const win = window.open("");
-    win.document.write(`<title>Foto da Ocorrência #${ocorrenciaAtual.numero}</title><img src="${imgUrl}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+    if (win) {
+        win.document.write(`<title>Foto da Ocorrência #${ocorrenciaAtual.numero}</title><img src="${url}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+    }
 }
 
 function baixarFotoConsulta() {
-    const imgBruta = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
-    const imgUrl = normalizarDataUrl(imgBruta);
-    if (!imgUrl) return alert("Nenhuma foto disponível para download.");
+    const raw = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const url = normalizarDataUrl(raw);
+    if (!url) return alert("Nenhuma foto disponível para download.");
     const a = document.createElement("a");
-    a.href = imgUrl;
+    a.href = url;
     a.download = `foto_ocorrencia_${ocorrenciaAtual.numero}.jpg`;
     a.click();
 }
@@ -2678,14 +2698,12 @@ function abrirDetalheOcorrencia(dados) {
     document.getElementById("resultadosNotificador").classList.add("hidden");
 }
 
-// Função para normalizar e corrigir qualquer Data URL corrompido por tradutores ou espaços
+// Função para normalizar e corrigir Data URL da foto
 function normalizarDataUrl(url) {
     if (!url || typeof url !== 'string') return null;
     let limpo = url.trim();
-    if (limpo.startsWith("dados:imagem")) {
-        limpo = limpo.replace(/^dados:imagem\/jpeg;\s*base64,\s*/i, "data:image/jpeg;base64,")
-                     .replace(/^dados:imagem\/png;\s*base64,\s*/i, "data:image/png;base64,")
-                     .replace(/^dados:imagem\/[a-z]+;\s*base64,\s*/i, "data:image/jpeg;base64,");
+    if (limpo.startsWith("dados:imagem") || limpo.startsWith("dados:image")) {
+        limpo = limpo.replace(/^dados:(?:imagem|image)\/[a-zA-Z0-9]+;\s*base64,\s*/i, "data:image/jpeg;base64,");
     }
     if (!limpo.startsWith("data:image/") && limpo.includes("base64,")) {
         limpo = "data:image/jpeg;base64," + limpo.split("base64,")[1].trim();
@@ -2716,33 +2734,24 @@ function preencherDadosConsulta(dados) {
     }
     document.getElementById("consultaNotaManutencao").textContent = dados.nota_manutencao || "Nenhuma nota de manutenção registrada.";
 
-    // Exibe a foto da ocorrência se estiver cadastrada
-    const fotoContainer = document.getElementById("consultaFotoContainer");
-    const fotoImg = document.getElementById("consultaFoto");
-    const fotoBruta = dados.foto || dados.foto_base64;
-    const fotoTratada = normalizarDataUrl(fotoBruta);
+    // Exibe a foto da ocorrência
+    const boxFoto = document.getElementById("consultaFotoContainer");
+    const imgFoto = document.getElementById("consultaFoto");
+    const avisoSemFoto = document.getElementById("consultaSemFotoAviso");
+    const botoesFoto = document.getElementById("consultaFotoBotoes");
 
-    if (fotoTratada && fotoContainer && fotoImg) {
-        fotoImg.src = fotoTratada;
-        fotoImg.style.display = "block";
-        const msgSemFoto = document.getElementById("msgSemFotoConsulta");
-        if (msgSemFoto) msgSemFoto.remove();
-        fotoContainer.classList.remove("hidden");
-    } else if (fotoContainer) {
-        if (fotoImg) {
-            fotoImg.src = "";
-            fotoImg.style.display = "none";
+    if (boxFoto) {
+        boxFoto.classList.remove("hidden");
+        const fotoValida = normalizarDataUrl(dados.foto || dados.foto_base64);
+        if (fotoValida) {
+            if (imgFoto) { imgFoto.src = fotoValida; imgFoto.style.display = "block"; }
+            if (avisoSemFoto) avisoSemFoto.style.display = "none";
+            if (botoesFoto) botoesFoto.style.display = "flex";
+        } else {
+            if (imgFoto) { imgFoto.src = ""; imgFoto.style.display = "none"; }
+            if (avisoSemFoto) avisoSemFoto.style.display = "block";
+            if (botoesFoto) botoesFoto.style.display = "none";
         }
-        let msgSemFoto = document.getElementById("msgSemFotoConsulta");
-        if (!msgSemFoto) {
-            msgSemFoto = document.createElement("div");
-            msgSemFoto.id = "msgSemFotoConsulta";
-            msgSemFoto.className = "info-item";
-            msgSemFoto.style.color = "#777";
-            msgSemFoto.textContent = "Nenhuma foto anexada a esta ocorrência.";
-            fotoContainer.insertBefore(msgSemFoto, fotoContainer.querySelector(".photo-actions"));
-        }
-        fotoContainer.classList.remove("hidden");
     }
 
     renderizarHistoricoOcorrencia(dados.observacao);
@@ -3185,4 +3194,204 @@ function renderizarListaManutencao() {
 
     // Filtro por Setor
     if (filtroArea) {
-        filtradas = filtradas.filter(item => (item.area || "") =
+        filtradas = filtradas.filter(item => (item.area || "") === filtroArea);
+    }
+
+    // Filtro por Área / Subárea
+    if (filtroLocal) {
+        filtradas = filtradas.filter(item => (item.local_vazamento || "") === filtroLocal);
+    }
+
+    // Filtro por Status específico
+    if (filtroStatus) {
+        filtradas = filtradas.filter(item => (item.status || "Aberto") === filtroStatus);
+    }
+
+    if (filtradas.length === 0) {
+        container.innerHTML = '<div class="empty-message">Nenhuma ocorrência encontrada para os filtros selecionados.</div>';
+        return;
+    }
+
+    container.innerHTML = "";
+
+    filtradas.forEach(item => {
+        const dataFormatada = item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "-";
+        const statusClasse = (item.status || "aberto").toLowerCase().replace(/\s+/g, "");
+        const div = document.createElement("div");
+        div.className = "maintenance-item";
+
+        div.innerHTML = `
+            <div class="maintenance-item-header">
+                <span class="maintenance-number">#${item.numero}</span>
+                <span class="status status-${statusClasse}">${item.status || "Aberto"}</span>
+            </div>
+            <div class="maintenance-details">
+                <div><strong>Setor:</strong> ${item.area || "-"}</div>
+                <div><strong>Local:</strong> ${item.local_vazamento || "-"}</div>
+                <div><strong>TAG / Equipamento:</strong> ${item.identificacao_tag || "-"}</div>
+                <div><strong>Substância:</strong> ${item.substancia || "-"}</div>
+                <div><strong>Intensidade:</strong> ${item.intensidade || "-"}</div>
+                <div><strong>Condição:</strong> ${item.condicao_intervencao || "-"}</div>
+                <div><strong>Notificador:</strong> ${item.nome || "-"} (${item.matricula || "-"})</div>
+                <div><strong>Data do Registro:</strong> ${dataFormatada}</div>
+            </div>
+            ${item.observacao ? `<div style="font-size:13px; color:#555; margin-bottom:8px;"><strong>Observação:</strong> ${item.observacao}</div>` : ""}
+            ${item.nota_manutencao ? `<div class="maintenance-note"><strong>Nota de Manutenção:</strong> ${item.nota_manutencao}</div>` : ""}
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <button type="button" class="btn-primary" style="font-size:13px; padding:8px 14px; width:auto;" onclick='tratarOcorrenciaManutencao(${JSON.stringify(item)})'>
+                    🛠️ Ver / Tratar Ocorrência
+                </button>
+            </div>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+function tratarOcorrenciaManutencao(item) {
+    mostrarTela('consulta');
+    preencherDadosConsulta(item);
+}
+
+function atualizarPainelManutencao() {
+    renderizarListaManutencao();
+}
+
+// Atualiza dinamicamente o select de Área no Painel de Manutenção com as subáreas mapeadas
+function atualizarSubAreasManutencao() {
+    const setor = document.getElementById("filtroManutencaoArea") ? document.getElementById("filtroManutencaoArea").value : "";
+    const selectLocal = document.getElementById("filtroManutencaoLocal");
+    if (!selectLocal) return;
+
+    const valorAtual = selectLocal.value;
+    selectLocal.innerHTML = '<option value="">Todas as áreas</option>';
+
+    if (setor && locaisPorSetor[setor]) {
+        locaisPorSetor[setor].forEach(local => {
+            const opt = document.createElement("option");
+            opt.value = local;
+            opt.textContent = local;
+            if (valorAtual === local) opt.selected = true;
+            selectLocal.appendChild(opt);
+        });
+    } else if (!setor) {
+        // Se nenhum setor estiver selecionado, exibe todas as subáreas mapeadas organizadas por setor
+        Object.keys(locaisPorSetor).forEach(s => {
+            locaisPorSetor[s].forEach(local => {
+                const opt = document.createElement("option");
+                opt.value = local;
+                opt.textContent = `${local} (${s})`;
+                if (valorAtual === local) opt.selected = true;
+                selectLocal.appendChild(opt);
+            });
+        });
+    }
+}
+
+function mostrarSomentePendentes() {
+    filtroApenasPendentes = true;
+    const selStatus = document.getElementById("filtroManutencaoStatus");
+    if (selStatus) selStatus.value = "";
+    renderizarListaManutencao();
+}
+
+function mostrarTodasOcorrenciasManutencao() {
+    filtroApenasPendentes = false;
+    const selStatus = document.getElementById("filtroManutencaoStatus");
+    if (selStatus) selStatus.value = "";
+    renderizarListaManutencao();
+}
+
+
+// --- EXPORTAÇÃO PARA EXCEL (.XLSX) ---
+async function exportarParaExcel() {
+    try {
+        const btnExportar = event ? event.target : null;
+        if (btnExportar) {
+            btnExportar.disabled = true;
+            btnExportar.textContent = "Gerando Excel...";
+        }
+
+        const { data, error } = await supabaseClient
+            .from("ocorrencias")
+            .select("*")
+            .order("numero", { ascending: true });
+
+        if (error) {
+            console.error("Erro ao exportar dados:", error);
+            alert("Erro ao buscar dados do Supabase: " + error.message);
+            if (btnExportar) {
+                btnExportar.disabled = false;
+                btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
+            }
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            alert("Não há dados cadastrados para exportar.");
+            if (btnExportar) {
+                btnExportar.disabled = false;
+                btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
+            }
+            return;
+        }
+
+        // Mapear colunas para cabeçalhos legíveis em português
+        const dadosFormatados = data.map(item => ({
+            "Número": item.numero || "",
+            "Data/Hora de Registro": item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "",
+            "Matrícula": item.matricula || "",
+            "Nome do Colaborador": item.nome || "",
+            "Empresa": item.empresa || "",
+            "Nome da Empresa Parceira": item.nome_empresa || "",
+            "Setor": item.area || "",
+            "Local do Vazamento": item.local_vazamento || "",
+            "Identificação / TAG": item.identificacao_tag || "",
+            "Substância": item.substancia || "",
+            "Especificar Substância": item.especificar_substancia || "",
+            "Intensidade": item.intensidade || "",
+            "Condição de Intervenção": item.condicao_intervencao || "",
+            "Status": item.status || "Aberto",
+            "Observação": item.observacao || "",
+            "Nota de Manutenção": item.nota_manutencao || "",
+            "Última Atualização": item.atualizado_em ? new Date(item.atualizado_em).toLocaleString("pt-BR") : "",
+            "Confirmação de Eliminação": item.confirmacao_eliminacao || ""
+        }));
+
+        // Cria a planilha e o arquivo Excel usando SheetJS
+        const worksheet = XLSX.utils.json_to_sheet(dadosFormatados);
+        
+        // Ajuste automático de largura de colunas
+        const colunas = Object.keys(dadosFormatados[0]);
+        worksheet["!cols"] = colunas.map(col => ({
+            wch: Math.max(col.length + 4, 15)
+        }));
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Ocorrências");
+
+        const dataAtual = new Date().toISOString().slice(0, 10);
+        const nomeArquivo = `SGV_Ocorrencias_${dataAtual}.xlsx`;
+
+        XLSX.writeFile(workbook, nomeArquivo);
+
+        if (btnExportar) {
+            btnExportar.disabled = false;
+            btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
+        }
+    } catch (err) {
+        console.error("Erro inesperado ao exportar:", err);
+        alert("Falha ao gerar o arquivo Excel: " + err.message);
+    }
+}
+
+
+// Inicialização automática ao carregar a página
+window.addEventListener("DOMContentLoaded", () => {
+    carregarFiltrosData();
+    carregarResumo();
+});
+
+</script>
+</body>
+</html>
