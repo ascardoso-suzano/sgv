@@ -2079,51 +2079,11 @@ function limparTelaConsulta() {
     const boxNotificador = document.getElementById("resultadosNotificador");
     if (boxNotificador) boxNotificador.classList.add("hidden");
 
-    const boxAtualizacaoSucesso = document.getElementById("atualizacaoSucesso");
-    if (boxAtualizacaoSucesso) boxAtualizacaoSucesso.classList.add("hidden");
-
-    const boxAvisoCancelada = document.getElementById("ocorrenciaCanceladaAviso");
-    if (boxAvisoCancelada) boxAvisoCancelada.classList.add("hidden");
-
     const campoNumero = document.getElementById("numeroConsulta");
     if (campoNumero) campoNumero.value = "";
 
     const lista = document.getElementById("listaResultados");
     if (lista) lista.innerHTML = "";
-
-    // Limpa campos do formulário de Atualizar Ocorrência
-    const selNovoStatus = document.getElementById("novoStatus");
-    if (selNovoStatus) selNovoStatus.value = "Aberto";
-
-    const matAtt = document.getElementById("matriculaAtualizacao");
-    if (matAtt) matAtt.value = "";
-
-    const descAtt = document.getElementById("descricaoAtualizacao");
-    if (descAtt) descAtt.value = "";
-
-    const notaManut = document.getElementById("notaManutencao");
-    if (notaManut) notaManut.value = "";
-
-    const selConfirmaConclusao = document.getElementById("confirmacaoConclusaoSelect");
-    if (selConfirmaConclusao) selConfirmaConclusao.value = "";
-
-    const boxConfirmaConclusao = document.getElementById("confirmacaoConclusao");
-    if (boxConfirmaConclusao) boxConfirmaConclusao.style.display = "none";
-
-    // Limpa campos do formulário de Cancelar Ocorrência
-    const matCanc = document.getElementById("matriculaCancelamento");
-    if (matCanc) matCanc.value = "";
-
-    const selConfirmaCanc = document.getElementById("confirmacaoCancelamento");
-    if (selConfirmaCanc) selConfirmaCanc.value = "";
-
-    const motCanc = document.getElementById("motivoCancelamento");
-    if (motCanc) motCanc.value = "";
-
-    const boxHist = document.getElementById("historicoOcorrencia");
-    if (boxHist) boxHist.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
-
-    ocorrenciaAtual = null;
 
     limparFiltros();
 }
@@ -2647,14 +2607,8 @@ function preencherDadosConsulta(dados) {
     document.getElementById("consultaIntensidade").textContent = dados.intensidade || "-";
     document.getElementById("consultaCondicao").textContent = dados.condicao_intervencao || "-";
     document.getElementById("consultaStatus").textContent = dados.status || "-";
-    const elObs = document.getElementById("consultaObservacao");
-    if (elObs) {
-        elObs.style.whiteSpace = "pre-wrap";
-        elObs.textContent = dados.observacao || "Nenhuma observação registrada.";
-    }
+    document.getElementById("consultaObservacao").textContent = dados.observacao || "Nenhuma observação registrada.";
     document.getElementById("consultaNotaManutencao").textContent = dados.nota_manutencao || "Nenhuma nota de manutenção registrada.";
-
-    renderizarHistoricoOcorrencia(dados.observacao);
 
     document.getElementById("resultadoConsulta").classList.remove("hidden");
     document.getElementById("resultadoConsulta").scrollIntoView({ behavior: 'smooth' });
@@ -2713,20 +2667,8 @@ async function atualizarStatus() {
 
     try {
         const agoraIso = new Date().toISOString();
-        const dataHoraFormatada = new Date().toLocaleString("pt-BR");
-
-        // Formata a linha de atualização com data, novo status, matrícula e o texto da ação
-        const linhaHistorico = `[${dataHoraFormatada} - ${novoStatus} (${matricula})]: ${descricao}`;
-
-        // Concatena com as observações anteriores sem apagar o que já existia
-        const obsAtual = (ocorrenciaAtual.observacao && ocorrenciaAtual.observacao !== "-" && ocorrenciaAtual.observacao !== "Nenhuma observação registrada.")
-            ? ocorrenciaAtual.observacao.trim()
-            : "";
-        const novaObservacao = obsAtual ? `${obsAtual}\n\n${linhaHistorico}` : linhaHistorico;
-
         const dadosAtualizacao = {
             status: novoStatus,
-            observacao: novaObservacao,
             atualizado_em: agoraIso
         };
 
@@ -2755,19 +2697,10 @@ async function atualizarStatus() {
 
         // Atualizar objeto local em tela
         ocorrenciaAtual.status = novoStatus;
-        ocorrenciaAtual.observacao = novaObservacao;
         if (nota) ocorrenciaAtual.nota_manutencao = nota;
 
         document.getElementById("consultaStatus").textContent = novoStatus;
-        const elObs = document.getElementById("consultaObservacao");
-        if (elObs) {
-            elObs.style.whiteSpace = "pre-wrap";
-            elObs.textContent = novaObservacao;
-        }
         if (nota) document.getElementById("consultaNotaManutencao").textContent = nota;
-
-        // Renderiza o quadro de Histórico
-        renderizarHistoricoOcorrencia(novaObservacao);
 
         // Feedback de sucesso
         const boxSucesso = document.getElementById("atualizacaoSucesso");
@@ -2784,7 +2717,6 @@ async function atualizarStatus() {
         // Limpar formulário de atualização
         document.getElementById("descricaoAtualizacao").value = "";
         document.getElementById("matriculaAtualizacao").value = "";
-        document.getElementById("notaManutencao").value = "";
 
         if (btn) {
             btn.disabled = false;
@@ -2801,26 +2733,6 @@ async function atualizarStatus() {
     }
 }
 
-function renderizarHistoricoOcorrencia(textoObservacao) {
-    const container = document.getElementById("historicoOcorrencia");
-    if (!container) return;
-
-    if (!textoObservacao || textoObservacao === "-" || textoObservacao === "Nenhuma observação registrada.") {
-        container.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
-        return;
-    }
-
-    const blocos = textoObservacao.split("\n\n").filter(b => b.trim().length > 0);
-    container.innerHTML = "";
-
-    blocos.forEach(bloco => {
-        const div = document.createElement("div");
-        div.className = "history-item";
-        div.style.whiteSpace = "pre-wrap";
-        div.innerHTML = `<div class="history-description">${bloco}</div>`;
-        container.appendChild(div);
-    });
-}
 async function cancelarOcorrencia() {
     if (!ocorrenciaAtual || !ocorrenciaAtual.numero) {
         alert("Nenhuma ocorrência selecionada.");
