@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="notranslate" translate="no">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
 <title>SGV - Sistema de Gestão de Vazamentos</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
@@ -2406,14 +2407,16 @@ function baixarFoto() {
 }
 
 function compartilharFotoConsulta() {
-    const imgUrl = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const imgBruta = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const imgUrl = normalizarDataUrl(imgBruta);
     if (!imgUrl) return alert("Nenhuma foto disponível para visualização.");
     const win = window.open("");
     win.document.write(`<title>Foto da Ocorrência #${ocorrenciaAtual.numero}</title><img src="${imgUrl}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
 }
 
 function baixarFotoConsulta() {
-    const imgUrl = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const imgBruta = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    const imgUrl = normalizarDataUrl(imgBruta);
     if (!imgUrl) return alert("Nenhuma foto disponível para download.");
     const a = document.createElement("a");
     a.href = imgUrl;
@@ -2675,6 +2678,23 @@ function abrirDetalheOcorrencia(dados) {
     document.getElementById("resultadosNotificador").classList.add("hidden");
 }
 
+// Função para normalizar e corrigir qualquer Data URL corrompido por tradutores ou espaços
+function normalizarDataUrl(url) {
+    if (!url || typeof url !== 'string') return null;
+    let limpo = url.trim();
+    if (limpo.startsWith("dados:imagem")) {
+        limpo = limpo.replace(/^dados:imagem\/jpeg;\s*base64,\s*/i, "data:image/jpeg;base64,")
+                     .replace(/^dados:imagem\/png;\s*base64,\s*/i, "data:image/png;base64,")
+                     .replace(/^dados:imagem\/[a-z]+;\s*base64,\s*/i, "data:image/jpeg;base64,");
+    }
+    if (!limpo.startsWith("data:image/") && limpo.includes("base64,")) {
+        limpo = "data:image/jpeg;base64," + limpo.split("base64,")[1].trim();
+    } else if (!limpo.startsWith("data:image/") && (limpo.startsWith("/9j/") || limpo.startsWith("iVBOR"))) {
+        limpo = "data:image/jpeg;base64," + limpo;
+    }
+    return limpo;
+}
+
 function preencherDadosConsulta(dados) {
     ocorrenciaAtual = dados;
     document.getElementById("consultaNumero").textContent = dados.numero || "-";
@@ -2699,14 +2719,30 @@ function preencherDadosConsulta(dados) {
     // Exibe a foto da ocorrência se estiver cadastrada
     const fotoContainer = document.getElementById("consultaFotoContainer");
     const fotoImg = document.getElementById("consultaFoto");
-    const fotoCadastrada = dados.foto || dados.foto_base64;
+    const fotoBruta = dados.foto || dados.foto_base64;
+    const fotoTratada = normalizarDataUrl(fotoBruta);
 
-    if (fotoCadastrada && fotoContainer && fotoImg) {
-        fotoImg.src = fotoCadastrada;
+    if (fotoTratada && fotoContainer && fotoImg) {
+        fotoImg.src = fotoTratada;
+        fotoImg.style.display = "block";
+        const msgSemFoto = document.getElementById("msgSemFotoConsulta");
+        if (msgSemFoto) msgSemFoto.remove();
         fotoContainer.classList.remove("hidden");
     } else if (fotoContainer) {
-        fotoContainer.classList.add("hidden");
-        if (fotoImg) fotoImg.src = "";
+        if (fotoImg) {
+            fotoImg.src = "";
+            fotoImg.style.display = "none";
+        }
+        let msgSemFoto = document.getElementById("msgSemFotoConsulta");
+        if (!msgSemFoto) {
+            msgSemFoto = document.createElement("div");
+            msgSemFoto.id = "msgSemFotoConsulta";
+            msgSemFoto.className = "info-item";
+            msgSemFoto.style.color = "#777";
+            msgSemFoto.textContent = "Nenhuma foto anexada a esta ocorrência.";
+            fotoContainer.insertBefore(msgSemFoto, fotoContainer.querySelector(".photo-actions"));
+        }
+        fotoContainer.classList.remove("hidden");
     }
 
     renderizarHistoricoOcorrencia(dados.observacao);
@@ -3149,43 +3185,4 @@ function renderizarListaManutencao() {
 
     // Filtro por Setor
     if (filtroArea) {
-        filtradas = filtradas.filter(item => (item.area || "") === filtroArea);
-    }
-
-    // Filtro por Área / Subárea
-    if (filtroLocal) {
-        filtradas = filtradas.filter(item => (item.local_vazamento || "") === filtroLocal);
-    }
-
-    // Filtro por Status específico
-    if (filtroStatus) {
-        filtradas = filtradas.filter(item => (item.status || "Aberto") === filtroStatus);
-    }
-
-    if (filtradas.length === 0) {
-        container.innerHTML = '<div class="empty-message">Nenhuma ocorrência encontrada para os filtros selecionados.</div>';
-        return;
-    }
-
-    container.innerHTML = "";
-
-    filtradas.forEach(item => {
-        const dataFormatada = item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "-";
-        const statusClasse = (item.status || "aberto").toLowerCase().replace(/\s+/g, "");
-        const div = document.createElement("div");
-        div.className = "maintenance-item";
-
-        div.innerHTML = `
-            <div class="maintenance-item-header">
-                <span class="maintenance-number">#${item.numero}</span>
-                <span class="status status-${statusClasse}">${item.status || "Aberto"}</span>
-            </div>
-            <div class="maintenance-details">
-                <div><strong>Setor:</strong> ${item.area || "-"}</div>
-                <div><strong>Local:</strong> ${item.local_vazamento || "-"}</div>
-                <div><strong>TAG / Equipamento:</strong> ${item.identificacao_tag || "-"}</div>
-                <div><strong>Substância:</strong> ${item.substancia || "-"}</div>
-                <div><strong>Intensidade:</strong> ${item.intensidade || "-"}</div>
-                <div><strong>Condição:</strong> ${item.condicao_intervencao || "-"}</div>
-                <div><strong>Notificador:</strong> ${item.nome || "-"} (${item.matricula || "-"})</div>
-                <div><strong>Data do
+        filtradas = filtradas.filter(item => (item.area || "") =
