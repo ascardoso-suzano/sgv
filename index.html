@@ -2535,23 +2535,11 @@ async function registrarOcorrencia() {
             return;
         }
 
-        // 5. SUCESSO: Mensagem na tela e limpeza do formulário
+        // 5. SUCESSO: Mensagem na tela, limpeza total e retorno para a tela principal
         alert(`Ocorrência nº ${proximoNumero} registrada com sucesso!`);
         
-        // Limpa os campos para o próximo uso
-        document.getElementById("matricula").value = "";
-        document.getElementById("nome").value = "";
-        document.getElementById("nome").readOnly = false;
-        document.getElementById("empresa").value = "";
-        document.getElementById("empresa").disabled = false;
-        if (document.getElementById("local")) document.getElementById("local").value = "";
-        if (document.getElementById("identificacao")) document.getElementById("identificacao").value = "";
-        if (document.getElementById("substancia")) document.getElementById("substancia").value = "";
-        if (document.getElementById("intensidade")) document.getElementById("intensidade").value = "";
-        if (document.getElementById("observacao")) document.getElementById("observacao").value = "";
-        
-        const mensagemColab = document.getElementById("colaboradorIdentificado");
-        if (mensagemColab) mensagemColab.classList.remove("show");
+        limparFormularioRegistro();
+        mostrarTela('home');
 
     } catch (errGeral) {
         console.error("Erro inesperado:", errGeral);
