@@ -2079,11 +2079,51 @@ function limparTelaConsulta() {
     const boxNotificador = document.getElementById("resultadosNotificador");
     if (boxNotificador) boxNotificador.classList.add("hidden");
 
+    const boxAtualizacaoSucesso = document.getElementById("atualizacaoSucesso");
+    if (boxAtualizacaoSucesso) boxAtualizacaoSucesso.classList.add("hidden");
+
+    const boxAvisoCancelada = document.getElementById("ocorrenciaCanceladaAviso");
+    if (boxAvisoCancelada) boxAvisoCancelada.classList.add("hidden");
+
     const campoNumero = document.getElementById("numeroConsulta");
     if (campoNumero) campoNumero.value = "";
 
     const lista = document.getElementById("listaResultados");
     if (lista) lista.innerHTML = "";
+
+    // Limpa campos do formulário de Atualizar Ocorrência
+    const selNovoStatus = document.getElementById("novoStatus");
+    if (selNovoStatus) selNovoStatus.value = "Aberto";
+
+    const matAtt = document.getElementById("matriculaAtualizacao");
+    if (matAtt) matAtt.value = "";
+
+    const descAtt = document.getElementById("descricaoAtualizacao");
+    if (descAtt) descAtt.value = "";
+
+    const notaManut = document.getElementById("notaManutencao");
+    if (notaManut) notaManut.value = "";
+
+    const selConfirmaConclusao = document.getElementById("confirmacaoConclusaoSelect");
+    if (selConfirmaConclusao) selConfirmaConclusao.value = "";
+
+    const boxConfirmaConclusao = document.getElementById("confirmacaoConclusao");
+    if (boxConfirmaConclusao) boxConfirmaConclusao.style.display = "none";
+
+    // Limpa campos do formulário de Cancelar Ocorrência
+    const matCanc = document.getElementById("matriculaCancelamento");
+    if (matCanc) matCanc.value = "";
+
+    const selConfirmaCanc = document.getElementById("confirmacaoCancelamento");
+    if (selConfirmaCanc) selConfirmaCanc.value = "";
+
+    const motCanc = document.getElementById("motivoCancelamento");
+    if (motCanc) motCanc.value = "";
+
+    const boxHist = document.getElementById("historicoOcorrencia");
+    if (boxHist) boxHist.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
+
+    ocorrenciaAtual = null;
 
     limparFiltros();
 }
@@ -2264,7 +2304,9 @@ const locaisPorSetor = {
     ],
     "Recuperação e Utilidades": [
         "CBC 3",
+        "EVA 700",
         "Gotaverken",
+        "EVA 900",
         "Zanini",
         "Caldeiras a Gás",
         "Turbinas",
@@ -2299,19 +2341,43 @@ function atualizarLocais() {
     }
 }
 
-// --- GESTÃO DE IMAGENS ---
+// --- GESTÃO DE IMAGENS COM COMPRESSÃO AUTOMÁTICA ---
 function mostrarFotoPreview(input) {
     const previewBox = document.getElementById("fotoPreview");
     const imgPreview = document.getElementById("imagemPreview");
 
     if (input && input.files && input.files[0]) {
+        const file = input.files[0];
         const reader = new FileReader();
         reader.onload = function(e) {
-            fotoBase64 = e.target.result;
-            imgPreview.src = fotoBase64;
-            previewBox.style.display = "block";
+            const img = new Image();
+            img.onload = function() {
+                // Redimensiona para resolução ideal (máx 1280px) evitando travamentos no Android
+                const maxDim = 1280;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                // Converte para JPEG com 75% de qualidade (gera ~250KB com ótima nitidez)
+                fotoBase64 = canvas.toDataURL("image/jpeg", 0.75);
+                imgPreview.src = fotoBase64;
+                previewBox.style.display = "block";
+            };
+            img.src = e.target.result;
         };
-        reader.readAsDataURL(input.files[0]);
+        reader.readAsDataURL(file);
     }
 }
 
@@ -2326,7 +2392,9 @@ function removerFoto() {
 }
 
 function compartilharFoto() {
-    alert("Funcionalidade de partilha em desenvolvimento.");
+    if (!fotoBase64) return;
+    const win = window.open("");
+    win.document.write(`<title>Foto da Ocorrência</title><img src="${fotoBase64}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
 }
 
 function baixarFoto() {
@@ -2337,8 +2405,21 @@ function baixarFoto() {
     a.click();
 }
 
-function compartilharFotoConsulta() { alert("Funcionalidade de partilha em desenvolvimento."); }
-function baixarFotoConsulta() { alert("Funcionalidade de download em desenvolvimento."); }
+function compartilharFotoConsulta() {
+    const imgUrl = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    if (!imgUrl) return alert("Nenhuma foto disponível para visualização.");
+    const win = window.open("");
+    win.document.write(`<title>Foto da Ocorrência #${ocorrenciaAtual.numero}</title><img src="${imgUrl}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+}
+
+function baixarFotoConsulta() {
+    const imgUrl = ocorrenciaAtual ? (ocorrenciaAtual.foto || ocorrenciaAtual.foto_base64) : null;
+    if (!imgUrl) return alert("Nenhuma foto disponível para download.");
+    const a = document.createElement("a");
+    a.href = imgUrl;
+    a.download = `foto_ocorrencia_${ocorrenciaAtual.numero}.jpg`;
+    a.click();
+}
 
 
 // --- REGISTRO DE OCORRÊNCIA ---
@@ -2385,7 +2466,7 @@ async function registrarOcorrencia() {
             console.log("Novo colaborador salvo automaticamente!");
         }
 
-        // 2. GERAR O NÚMERO (formato inteiro int8, ex: 202600008)
+        // 2. GERAR O NÚMERO (formato padrão com 4 dígitos do ano, ex: 202600001)
         const anoAtual = new Date().getFullYear();
         const { data: ultimasOcorrencias } = await supabaseClient
             .from("ocorrencias")
@@ -2414,6 +2495,7 @@ async function registrarOcorrencia() {
             intensidade: intensidade,
             condicao_intervencao: condicaoIntervencao,
             observacao: observacao,
+            foto: fotoBase64 || null,
             status: "Aberto",
             data_hora: agoraIso,
             atualizado_em: agoraIso
@@ -2607,8 +2689,27 @@ function preencherDadosConsulta(dados) {
     document.getElementById("consultaIntensidade").textContent = dados.intensidade || "-";
     document.getElementById("consultaCondicao").textContent = dados.condicao_intervencao || "-";
     document.getElementById("consultaStatus").textContent = dados.status || "-";
-    document.getElementById("consultaObservacao").textContent = dados.observacao || "Nenhuma observação registrada.";
+    const elObs = document.getElementById("consultaObservacao");
+    if (elObs) {
+        elObs.style.whiteSpace = "pre-wrap";
+        elObs.textContent = dados.observacao || "Nenhuma observação registrada.";
+    }
     document.getElementById("consultaNotaManutencao").textContent = dados.nota_manutencao || "Nenhuma nota de manutenção registrada.";
+
+    // Exibe a foto da ocorrência se estiver cadastrada
+    const fotoContainer = document.getElementById("consultaFotoContainer");
+    const fotoImg = document.getElementById("consultaFoto");
+    const fotoCadastrada = dados.foto || dados.foto_base64;
+
+    if (fotoCadastrada && fotoContainer && fotoImg) {
+        fotoImg.src = fotoCadastrada;
+        fotoContainer.classList.remove("hidden");
+    } else if (fotoContainer) {
+        fotoContainer.classList.add("hidden");
+        if (fotoImg) fotoImg.src = "";
+    }
+
+    renderizarHistoricoOcorrencia(dados.observacao);
 
     document.getElementById("resultadoConsulta").classList.remove("hidden");
     document.getElementById("resultadoConsulta").scrollIntoView({ behavior: 'smooth' });
@@ -2667,8 +2768,20 @@ async function atualizarStatus() {
 
     try {
         const agoraIso = new Date().toISOString();
+        const dataHoraFormatada = new Date().toLocaleString("pt-BR");
+
+        // Formata a linha de atualização com data, novo status, matrícula e o texto da ação
+        const linhaHistorico = `[${dataHoraFormatada} - ${novoStatus} (${matricula})]: ${descricao}`;
+
+        // Concatena com as observações anteriores sem apagar o que já existia
+        const obsAtual = (ocorrenciaAtual.observacao && ocorrenciaAtual.observacao !== "-" && ocorrenciaAtual.observacao !== "Nenhuma observação registrada.")
+            ? ocorrenciaAtual.observacao.trim()
+            : "";
+        const novaObservacao = obsAtual ? `${obsAtual}\n\n${linhaHistorico}` : linhaHistorico;
+
         const dadosAtualizacao = {
             status: novoStatus,
+            observacao: novaObservacao,
             atualizado_em: agoraIso
         };
 
@@ -2697,10 +2810,19 @@ async function atualizarStatus() {
 
         // Atualizar objeto local em tela
         ocorrenciaAtual.status = novoStatus;
+        ocorrenciaAtual.observacao = novaObservacao;
         if (nota) ocorrenciaAtual.nota_manutencao = nota;
 
         document.getElementById("consultaStatus").textContent = novoStatus;
+        const elObs = document.getElementById("consultaObservacao");
+        if (elObs) {
+            elObs.style.whiteSpace = "pre-wrap";
+            elObs.textContent = novaObservacao;
+        }
         if (nota) document.getElementById("consultaNotaManutencao").textContent = nota;
+
+        // Renderiza o quadro de Histórico
+        renderizarHistoricoOcorrencia(novaObservacao);
 
         // Feedback de sucesso
         const boxSucesso = document.getElementById("atualizacaoSucesso");
@@ -2717,6 +2839,7 @@ async function atualizarStatus() {
         // Limpar formulário de atualização
         document.getElementById("descricaoAtualizacao").value = "";
         document.getElementById("matriculaAtualizacao").value = "";
+        document.getElementById("notaManutencao").value = "";
 
         if (btn) {
             btn.disabled = false;
@@ -2733,6 +2856,26 @@ async function atualizarStatus() {
     }
 }
 
+function renderizarHistoricoOcorrencia(textoObservacao) {
+    const container = document.getElementById("historicoOcorrencia");
+    if (!container) return;
+
+    if (!textoObservacao || textoObservacao === "-" || textoObservacao === "Nenhuma observação registrada.") {
+        container.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
+        return;
+    }
+
+    const blocos = textoObservacao.split("\n\n").filter(b => b.trim().length > 0);
+    container.innerHTML = "";
+
+    blocos.forEach(bloco => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.style.whiteSpace = "pre-wrap";
+        div.innerHTML = `<div class="history-description">${bloco}</div>`;
+        container.appendChild(div);
+    });
+}
 async function cancelarOcorrencia() {
     if (!ocorrenciaAtual || !ocorrenciaAtual.numero) {
         alert("Nenhuma ocorrência selecionada.");
@@ -3045,165 +3188,4 @@ function renderizarListaManutencao() {
                 <div><strong>Intensidade:</strong> ${item.intensidade || "-"}</div>
                 <div><strong>Condição:</strong> ${item.condicao_intervencao || "-"}</div>
                 <div><strong>Notificador:</strong> ${item.nome || "-"} (${item.matricula || "-"})</div>
-                <div><strong>Data do Registro:</strong> ${dataFormatada}</div>
-            </div>
-            ${item.observacao ? `<div style="font-size:13px; color:#555; margin-bottom:8px;"><strong>Observação:</strong> ${item.observacao}</div>` : ""}
-            ${item.nota_manutencao ? `<div class="maintenance-note"><strong>Nota de Manutenção:</strong> ${item.nota_manutencao}</div>` : ""}
-            <div style="margin-top:12px; display:flex; gap:8px;">
-                <button type="button" class="btn-primary" style="font-size:13px; padding:8px 14px; width:auto;" onclick='tratarOcorrenciaManutencao(${JSON.stringify(item)})'>
-                    🛠️ Ver / Tratar Ocorrência
-                </button>
-            </div>
-        `;
-
-        container.appendChild(div);
-    });
-}
-
-function tratarOcorrenciaManutencao(item) {
-    mostrarTela('consulta');
-    preencherDadosConsulta(item);
-}
-
-function atualizarPainelManutencao() {
-    renderizarListaManutencao();
-}
-
-// Atualiza dinamicamente o select de Área no Painel de Manutenção com as subáreas mapeadas
-function atualizarSubAreasManutencao() {
-    const setor = document.getElementById("filtroManutencaoArea") ? document.getElementById("filtroManutencaoArea").value : "";
-    const selectLocal = document.getElementById("filtroManutencaoLocal");
-    if (!selectLocal) return;
-
-    const valorAtual = selectLocal.value;
-    selectLocal.innerHTML = '<option value="">Todas as áreas</option>';
-
-    if (setor && locaisPorSetor[setor]) {
-        locaisPorSetor[setor].forEach(local => {
-            const opt = document.createElement("option");
-            opt.value = local;
-            opt.textContent = local;
-            if (valorAtual === local) opt.selected = true;
-            selectLocal.appendChild(opt);
-        });
-    } else if (!setor) {
-        // Se nenhum setor estiver selecionado, exibe todas as subáreas mapeadas organizadas por setor
-        Object.keys(locaisPorSetor).forEach(s => {
-            locaisPorSetor[s].forEach(local => {
-                const opt = document.createElement("option");
-                opt.value = local;
-                opt.textContent = `${local} (${s})`;
-                if (valorAtual === local) opt.selected = true;
-                selectLocal.appendChild(opt);
-            });
-        });
-    }
-}
-
-function mostrarSomentePendentes() {
-    filtroApenasPendentes = true;
-    const selStatus = document.getElementById("filtroManutencaoStatus");
-    if (selStatus) selStatus.value = "";
-    renderizarListaManutencao();
-}
-
-function mostrarTodasOcorrenciasManutencao() {
-    filtroApenasPendentes = false;
-    const selStatus = document.getElementById("filtroManutencaoStatus");
-    if (selStatus) selStatus.value = "";
-    renderizarListaManutencao();
-}
-
-
-// --- EXPORTAÇÃO PARA EXCEL (.XLSX) ---
-async function exportarParaExcel() {
-    try {
-        const btnExportar = event ? event.target : null;
-        if (btnExportar) {
-            btnExportar.disabled = true;
-            btnExportar.textContent = "Gerando Excel...";
-        }
-
-        const { data, error } = await supabaseClient
-            .from("ocorrencias")
-            .select("*")
-            .order("numero", { ascending: true });
-
-        if (error) {
-            console.error("Erro ao exportar dados:", error);
-            alert("Erro ao buscar dados do Supabase: " + error.message);
-            if (btnExportar) {
-                btnExportar.disabled = false;
-                btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
-            }
-            return;
-        }
-
-        if (!data || data.length === 0) {
-            alert("Não há dados cadastrados para exportar.");
-            if (btnExportar) {
-                btnExportar.disabled = false;
-                btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
-            }
-            return;
-        }
-
-        // Mapear colunas para cabeçalhos legíveis em português
-        const dadosFormatados = data.map(item => ({
-            "Número": item.numero || "",
-            "Data/Hora de Registro": item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "",
-            "Matrícula": item.matricula || "",
-            "Nome do Colaborador": item.nome || "",
-            "Empresa": item.empresa || "",
-            "Nome da Empresa Parceira": item.nome_empresa || "",
-            "Setor": item.area || "",
-            "Local do Vazamento": item.local_vazamento || "",
-            "Identificação / TAG": item.identificacao_tag || "",
-            "Substância": item.substancia || "",
-            "Especificar Substância": item.especificar_substancia || "",
-            "Intensidade": item.intensidade || "",
-            "Condição de Intervenção": item.condicao_intervencao || "",
-            "Status": item.status || "Aberto",
-            "Observação": item.observacao || "",
-            "Nota de Manutenção": item.nota_manutencao || "",
-            "Última Atualização": item.atualizado_em ? new Date(item.atualizado_em).toLocaleString("pt-BR") : "",
-            "Confirmação de Eliminação": item.confirmacao_eliminacao || ""
-        }));
-
-        // Cria a planilha e o arquivo Excel usando SheetJS
-        const worksheet = XLSX.utils.json_to_sheet(dadosFormatados);
-        
-        // Ajuste automático de largura de colunas
-        const colunas = Object.keys(dadosFormatados[0]);
-        worksheet["!cols"] = colunas.map(col => ({
-            wch: Math.max(col.length + 4, 15)
-        }));
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Ocorrências");
-
-        const dataAtual = new Date().toISOString().slice(0, 10);
-        const nomeArquivo = `SGV_Ocorrencias_${dataAtual}.xlsx`;
-
-        XLSX.writeFile(workbook, nomeArquivo);
-
-        if (btnExportar) {
-            btnExportar.disabled = false;
-            btnExportar.textContent = "📊 Exportar para Excel (.xlsx)";
-        }
-    } catch (err) {
-        console.error("Erro inesperado ao exportar:", err);
-        alert("Falha ao gerar o arquivo Excel: " + err.message);
-    }
-}
-
-
-// Inicialização automática ao carregar a página
-window.addEventListener("DOMContentLoaded", () => {
-    carregarFiltrosData();
-    carregarResumo();
-});
-
-</script>
-</body>
-</html>
+                <div><strong>Data do
