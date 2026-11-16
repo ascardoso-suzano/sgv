@@ -4,10 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SGV - Sistema de Gestão de Vazamentos</title>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
 <style>
 *{box-sizing:border-box}
 
@@ -705,11 +703,96 @@ button{
         grid-template-columns:1fr 1fr
     }
 }
+
+.financial-banner{
+    background:#f4f8fb;
+    border:1px solid #c9d9e8;
+    border-left:4px solid #1f4e79;
+    border-radius:8px;
+    padding:14px 16px;
+    margin-top:16px
+}
+
+.financial-tag{
+    display:inline-block;
+    background:#fdf2f2;
+    color:#9b2226;
+    border:1px solid #f5c2c7;
+    border-radius:6px;
+    padding:4px 9px;
+    font-size:12px;
+    font-weight:bold;
+    margin-top:6px
+}
+
+.financial-tag.measured{
+    background:#eef4f9;
+    color:#1f4e79;
+    border-color:#c9d9e8
+}
+
+.modal-overlay{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.55);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:1000;
+    padding:15px
+}
+
+.modal-card{
+    background:#fff;
+    border-radius:10px;
+    max-width:850px;
+    width:100%;
+    max-height:90vh;
+    overflow-y:auto;
+    padding:22px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2)
+}
+
+.table-responsive{
+    width:100%;
+    overflow-x:auto;
+    margin-top:12px
+}
+
+.cost-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px
+}
+
+.cost-table th,
+.cost-table td{
+    border-bottom:1px solid #ddd;
+    padding:8px 6px;
+    text-align:left;
+    white-space:nowrap
+}
+
+.cost-table th{
+    background:#f4f6f8;
+    color:#1f4e79;
+    font-weight:bold
+}
+
+.cost-input{
+    width:82px;
+    padding:6px 8px;
+    font-size:13px;
+    border:1px solid #ccc;
+    border-radius:4px;
+    text-align:right
+}
 </style>
 </head>
-
 <body>
-
 <header>
 <div class="header-content">
 <div class="header-titles">
@@ -974,16 +1057,19 @@ Substância <span class="required">*</span>
 
 <option value="">Selecione</option>
 <option value="Celulose">Celulose</option>
-<option value="Água / Filtrado">Água / Filtrado</option>
+<option value="Água / Filtrado / Condensado">Água / Filtrado / Condensado</option>
 <option value="Vapor">Vapor</option>
 <option value="Licor Branco">Licor Branco</option>
 <option value="Licor Negro">Licor Negro</option>
+<option value="Licor Negro (70%)">Licor Negro (70%)</option>
 <option value="Licor Verde">Licor Verde</option>
 <option value="Lama">Lama</option>
 <option value="Óleo">Óleo</option>
 <option value="Ar de Serviço / Ar de Instrumento">
 Ar de Serviço / Ar de Instrumento
 </option>
+<option value="Sulfato">Sulfato</option>
+<option value="Dióxido de Cloro">Dióxido de Cloro</option>
 <option value="Produto Químico">Produto Químico</option>
 <option value="Outro">Outro</option>
 
@@ -1032,6 +1118,7 @@ Intensidade <span class="required">*</span>
 <option value="Médio">Médio</option>
 <option value="Baixo">Baixo</option>
 <option value="Gotejando">Gotejando</option>
+<option value="Intermitente">Intermitente</option>
 
 </select>
 
@@ -1060,6 +1147,19 @@ Parada
 </select>
 
 </div>
+
+</div>
+
+<div class="field">
+
+<label for="notaManutencaoRegistro">
+Nota de Manutenção
+</label>
+
+<input
+type="text"
+id="notaManutencaoRegistro"
+placeholder="Campo opcional. Ex.: 10293847">
 
 </div>
 
@@ -1402,11 +1502,16 @@ Limpar filtros
 
 <h2>Dados da Ocorrência</h2>
 
-<div class="occurrence-number">
+<div class="occurrence-number" style="display:flex; justify-content:space-between; align-items:center;">
 
+<div>
 <strong>Número da Ocorrência</strong>
-
 <span id="consultaNumero">-</span>
+</div>
+
+<button id="btnAbrirEdicao" type="button" class="btn-secondary" style="padding:8px 12px; font-size:13px;" onclick="abrirModalEdicaoOcorrencia()">
+✏️ Editar
+</button>
 
 </div>
 
@@ -1467,6 +1572,22 @@ Limpar filtros
 <div class="info-value" id="consultaStatus">-</div>
 </div>
 
+</div>
+
+<div id="consultaImpactoFinanceiro" class="financial-banner">
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+<div>
+<div style="font-size:12px; color:#555; font-weight:bold; text-transform:uppercase;">Tempo em Aberto / Duração</div>
+<div id="consultaTempoDecorrido" style="font-size:18px; font-weight:bold; color:#1f4e79; margin-top:2px;">-</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:12px; color:#555; font-weight:bold; text-transform:uppercase;">Perda Financeira Estimada</div>
+<div id="consultaPerdaFinanceira" style="font-size:22px; font-weight:bold; color:#9b2226; margin-top:2px;">R$ 0,00</div>
+</div>
+</div>
+<div id="consultaBaseCalculo" style="font-size:12px; color:#555; margin-top:8px; padding-top:8px; border-top:1px solid #dce6f0;">
+-
+</div>
 </div>
 
 <div class="field" style="margin-top:18px;">
@@ -1595,6 +1716,53 @@ Nota de Manutenção
 <textarea
 id="notaManutencao"
 placeholder="Campo opcional. Ex.: Necessário substituir junta da flange. Material disponível no almoxarifado."></textarea>
+
+</div>
+
+<div class="field" style="background:#f8fafc; border:1px solid #dbe4ee; border-radius:8px; padding:14px;">
+
+<label for="mensuravelVazamento">
+Pode ser mensurado o volume do vazamento?
+</label>
+
+<select
+id="mensuravelVazamento"
+onchange="verificarMensuracao()">
+
+<option value="">Não informado / Manter atual</option>
+<option value="Não">Não</option>
+<option value="Sim">Sim</option>
+
+</select>
+
+<div id="camposMensuracao" class="grid-2 hidden" style="margin-top:14px;">
+
+<div class="field" style="margin-bottom:0;">
+
+<label for="vazaoUnidade">
+Unidade de Medida <span class="required">*</span>
+</label>
+
+<select id="vazaoUnidade"></select>
+
+</div>
+
+<div class="field" style="margin-bottom:0;">
+
+<label for="vazaoValor">
+Valor Numérico da Vazão <span class="required">*</span>
+</label>
+
+<input
+type="number"
+id="vazaoValor"
+step="0.01"
+min="0.001"
+placeholder="Ex.: 15.5">
+
+</div>
+
+</div>
 
 </div>
 
@@ -1791,7 +1959,10 @@ onclick="exportarParaExcel()">
 
 <div class="section-header-top">
 <h2>Painel da Manutenção</h2>
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+<button type="button" class="btn-secondary" style="background:#eef4f9; color:#1f4e79; border:1px solid #c9d9e8;" onclick="abrirModalCustos()">🔒 Tabela de Custos</button>
 <button type="button" class="btn-secondary" onclick="mostrarTela('home')">Voltar</button>
+</div>
 </div>
 
 <p>
@@ -1851,6 +2022,16 @@ Em Execução
 
 </div>
 
+</div>
+
+<div class="section-card" style="background:#eef4f9; border-color:#c9d9e8; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+<div>
+<div style="font-size:13px; font-weight:bold; color:#1f4e79;">Perda Financeira Estimada (Ocorrências Pendentes)</div>
+<div style="font-size:12px; color:#555; margin-top:2px;">Soma acumulada desde a abertura (régua conservadora ou medição técnica)</div>
+</div>
+<div id="manutencaoPerdaTotal" style="font-size:24px; font-weight:bold; color:#9b2226;">
+R$ 0,00
+</div>
 </div>
 
 <div class="section-card">
@@ -1913,6 +2094,8 @@ onchange="atualizarPainelManutencao()">
 
 </div>
 
+<div class="grid-2">
+
 <div class="field">
 
 <label for="filtroManutencaoLocal">
@@ -1926,6 +2109,25 @@ onchange="atualizarPainelManutencao()">
 <option value="">Todas as áreas</option>
 
 </select>
+
+</div>
+
+<div class="field">
+
+<label for="filtroManutencaoOrdenacao">
+Ordenar por
+</label>
+
+<select
+id="filtroManutencaoOrdenacao"
+onchange="atualizarPainelManutencao()">
+
+<option value="recentes">Mais recentes</option>
+<option value="maior_perda">Maior perda estimada (R$)</option>
+
+</select>
+
+</div>
 
 </div>
 
@@ -1984,8 +2186,122 @@ onclick="exportarParaExcel()">
 
 </section>
 
-</main>
 
+<div id="modalTabelaCustos" class="modal-overlay hidden">
+<div class="modal-card">
+
+<div class="section-header-top">
+<h2>Tabela de Custos e Parâmetros (Acesso Restrito)</h2>
+<button type="button" class="btn-secondary" onclick="fecharModalCustos()">Fechar</button>
+</div>
+
+<div id="custosLoginBox">
+<p style="font-size:14px; color:#555;">
+Informe a senha administrativa para visualizar ou editar os custos unitários e taxas conservadoras de vazamento.
+</p>
+<div class="field" style="max-width:320px;">
+<label for="senhaTabelaCustos">Senha de Acesso</label>
+<input
+type="password"
+id="senhaTabelaCustos"
+placeholder="Digite a senha"
+onkeydown="if(event.key === 'Enter') validarSenhaCustos()">
+</div>
+<div id="erroSenhaCustos" class="error-box hidden" style="max-width:320px;">
+Senha incorreta. Tente novamente.
+</div>
+<div class="buttons">
+<button type="button" class="btn-primary" onclick="validarSenhaCustos()">Acessar Tabela</button>
+<button type="button" class="btn-secondary" onclick="fecharModalCustos()">Cancelar</button>
+</div>
+</div>
+
+<div id="custosEditorBox" class="hidden">
+<p style="font-size:13px; color:#555; line-height:1.5;">
+Defina o <strong>Custo Unitário (R$)</strong> por unidade base de cada fluido e as <strong>vazões conservadoras por hora</strong> para quando o vazamento ainda não tiver sido medido tecnicamente em campo.
+</p>
+
+<div class="table-responsive">
+<table class="cost-table">
+<thead>
+<tr>
+<th>Substância</th>
+<th>Unid. Base</th>
+<th>Custo Unit. (R$)</th>
+<th>Gotejando (unid/h)</th>
+<th>Baixo (unid/h)</th>
+<th>Médio (unid/h)</th>
+<th>Alto (unid/h)</th>
+</tr>
+</thead>
+<tbody id="tbodyParametrosCustos"></tbody>
+</table>
+</div>
+
+<div id="msgSalvarCustos" class="hidden" style="margin-top:12px; padding:10px; border-radius:6px; font-size:13px; font-weight:bold;"></div>
+
+<div class="buttons">
+<button type="button" id="btnSalvarParametrosCustos" class="btn-primary" onclick="salvarParametrosCustos()">💾 Salvar Parâmetros</button>
+<button type="button" class="btn-secondary" onclick="restaurarPadraoConservador()">↺ Restaurar Régua Conservadora</button>
+<button type="button" class="btn-secondary" onclick="fecharModalCustos()">Fechar</button>
+</div>
+</div>
+
+</div>
+</div>
+
+
+<div id="modalEdicaoOcorrencia" class="modal-overlay hidden">
+<div class="modal-card" style="max-width:500px;">
+
+<div class="section-header-top">
+<h2>Editar Dados Básicos</h2>
+<button type="button" class="btn-secondary" onclick="fecharModalEdicaoOcorrencia()">Fechar</button>
+</div>
+
+<p style="font-size:13px; color:#555; margin-bottom:20px;">
+A alteração de Intensidade atualizará a estimativa financeira instantaneamente.
+</p>
+
+<div class="field">
+<label for="edicaoIntensidade">Intensidade</label>
+<select id="edicaoIntensidade">
+<option value="Alto">Alto</option>
+<option value="Médio">Médio</option>
+<option value="Baixo">Baixo</option>
+<option value="Gotejando">Gotejando</option>
+<option value="Intermitente">Intermitente</option>
+</select>
+</div>
+
+<div class="field">
+<label for="edicaoCondicao">Condição de Intervenção</label>
+<select id="edicaoCondicao">
+<option value="Não informado">Não informado</option>
+<option value="Em Operação">Em Operação</option>
+<option value="Parada">Parada</option>
+</select>
+</div>
+
+<div class="field">
+<label for="edicaoNota">Nota de Manutenção</label>
+<input type="text" id="edicaoNota" placeholder="Ex.: 10293847">
+</div>
+
+<div class="field">
+<label for="edicaoMatricula">Matrícula (Quem está editando) <span class="required">*</span></label>
+<input type="text" id="edicaoMatricula" placeholder="Digite sua matrícula">
+</div>
+
+<div class="buttons" style="margin-top:25px;">
+<button type="button" id="btnSalvarEdicao" class="btn-primary" onclick="salvarEdicaoOcorrencia()">💾 Salvar Alterações</button>
+<button type="button" class="btn-secondary" onclick="fecharModalEdicaoOcorrencia()">Cancelar</button>
+</div>
+
+</div>
+</div>
+
+</main>
 <script>
 // --- CONFIGURAÇÃO DO SUPABASE ---
 // IMPORTANTE: Substitua pelas suas credenciais reais do Supabase!
@@ -2002,10 +2318,198 @@ const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
 let ocorrenciaAtual = null;
 let fotoBase64 = null;
 let timerBuscaMatricula = null;
+let resultadosNotificadorCache = [];
+let tabelaCustosDesbloqueada = false;
+
+// Tabela Padrão Conservadora ("régua mais baixa") para estimativa financeira
+const PARAMETROS_CUSTOS_PADRAO = [
+    { substancia: "Água / Filtrado / Condensado", unidade_base: "m³", custo_unitario: 2.00, vazao_gotejando: 0.00036, vazao_baixo: 0.006, vazao_medio: 0.036, vazao_alto: 0.18 },
+    { substancia: "Vapor", unidade_base: "ton", custo_unitario: 85.00, vazao_gotejando: 0.000288, vazao_baixo: 0.00216, vazao_medio: 0.01152, vazao_alto: 0.0504 },
+    { substancia: "Ar de Serviço / Ar de Instrumento", unidade_base: "m³", custo_unitario: 0.10, vazao_gotejando: 0.06, vazao_baixo: 0.48, vazao_medio: 2.4, vazao_alto: 9.6 },
+    { substancia: "Licor Branco", unidade_base: "m³", custo_unitario: 40.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Licor Negro", unidade_base: "m³", custo_unitario: 20.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Licor Negro (70%)", unidade_base: "m³", custo_unitario: 20.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Licor Verde", unidade_base: "m³", custo_unitario: 25.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Celulose", unidade_base: "m³", custo_unitario: 50.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Lama", unidade_base: "m³", custo_unitario: 12.00, vazao_gotejando: 0.00024, vazao_baixo: 0.0036, vazao_medio: 0.018, vazao_alto: 0.096 },
+    { substancia: "Óleo", unidade_base: "L", custo_unitario: 15.00, vazao_gotejando: 0.018, vazao_baixo: 0.12, vazao_medio: 0.60, vazao_alto: 2.4 },
+    { substancia: "Sulfato", unidade_base: "L", custo_unitario: 6.00, vazao_gotejando: 0.018, vazao_baixo: 0.12, vazao_medio: 0.60, vazao_alto: 2.4 },
+    { substancia: "Dióxido de Cloro", unidade_base: "L", custo_unitario: 6.00, vazao_gotejando: 0.018, vazao_baixo: 0.12, vazao_medio: 0.60, vazao_alto: 2.4 },
+    { substancia: "Produto Químico", unidade_base: "L", custo_unitario: 6.00, vazao_gotejando: 0.018, vazao_baixo: 0.12, vazao_medio: 0.60, vazao_alto: 2.4 },
+    { substancia: "Outro", unidade_base: "m³", custo_unitario: 4.00, vazao_gotejando: 0.00036, vazao_baixo: 0.006, vazao_medio: 0.036, vazao_alto: 0.18 }
+];
+
+let mapaParametrosCustos = {};
+PARAMETROS_CUSTOS_PADRAO.forEach(p => {
+    mapaParametrosCustos[p.substancia] = { ...p };
+});
+
+async function carregarParametrosCustos() {
+    try {
+        const { data, error } = await supabaseClient
+            .from("parametros_custos")
+            .select("*");
+
+        if (!error && data && data.length > 0) {
+            data.forEach(item => {
+                if (item.substancia) {
+                    mapaParametrosCustos[item.substancia] = {
+                        substancia: item.substancia,
+                        unidade_base: item.unidade_base || "m³",
+                        custo_unitario: Number(item.custo_unitario) || 0,
+                        vazao_gotejando: Number(item.vazao_gotejando) || 0,
+                        vazao_baixo: Number(item.vazao_baixo) || 0,
+                        vazao_medio: Number(item.vazao_medio) || 0,
+                        vazao_alto: Number(item.vazao_alto) || 0
+                    };
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Usando parâmetros conservadores locais:", e);
+    }
+}
+
+function formatarMoedaBRL(valor) {
+    const num = Number(valor) || 0;
+    return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatarTempoDecorrido(horas) {
+    if (horas < 1) {
+        const mins = Math.max(1, Math.round(horas * 60));
+        return `${mins} min`;
+    }
+    if (horas < 24) {
+        const h = Math.floor(horas);
+        const m = Math.round((horas - h) * 60);
+        return m > 0 ? `${h}h ${m}min` : `${h}h`;
+    }
+    const dias = Math.floor(horas / 24);
+    const horasResto = Math.floor(horas % 24);
+    return horasResto > 0 ? `${dias}d ${horasResto}h` : `${dias}d`;
+}
+
+function calcularPerdaOcorrencia(item) {
+    const substancia = item.substancia || "Outro";
+    const param = mapaParametrosCustos[substancia] || mapaParametrosCustos["Outro"];
+
+    const inicio = item.data_hora ? new Date(item.data_hora) : new Date();
+    const statusNorm = (item.status || "Aberto").trim();
+    const encerrada = (statusNorm === "Concluído" || statusNorm === "Cancelado");
+    const fim = encerrada && item.atualizado_em ? new Date(item.atualizado_em) : new Date();
+
+    const diffMs = Math.max(0, fim.getTime() - inicio.getTime());
+    const horas = diffMs / (1000 * 60 * 60);
+    const tempoFormatado = formatarTempoDecorrido(horas);
+
+    let taxaBaseHora = 0;
+    let origem = "";
+    let isMedido = false;
+
+    const valorMedido = parseFloat(item.vazao_valor);
+    if (item.mensuravel === "Sim" && !isNaN(valorMedido) && valorMedido > 0 && item.vazao_unidade) {
+        const unid = item.vazao_unidade;
+        let taxaLhOuKgh = 0;
+
+        if (unid === "ml/min") taxaLhOuKgh = valorMedido * 0.06;
+        else if (unid === "L/min") taxaLhOuKgh = valorMedido * 60;
+        else if (unid === "L/h") taxaLhOuKgh = valorMedido;
+        else if (unid === "m³/h" || unid === "Nm³/h") taxaLhOuKgh = valorMedido * 1000;
+        else if (unid === "g/min") taxaLhOuKgh = valorMedido * 0.06;
+        else if (unid === "kg/h") taxaLhOuKgh = valorMedido;
+        else if (unid === "t/h") taxaLhOuKgh = valorMedido * 1000;
+        else taxaLhOuKgh = valorMedido;
+
+        if (param.unidade_base === "m³" || param.unidade_base === "ton") {
+            taxaBaseHora = taxaLhOuKgh / 1000;
+        } else {
+            taxaBaseHora = taxaLhOuKgh;
+        }
+
+        origem = `Medição técnica (${valorMedido} ${unid})`;
+        isMedido = true;
+    } else {
+        const intNorm = (item.intensidade || "Baixo").trim().toLowerCase();
+        if (intNorm === "intermitente") {
+            taxaBaseHora = 0;
+            origem = "Sem perda calculada (Intermitente)";
+        } else {
+            if (intNorm === "gotejando") taxaBaseHora = Number(param.vazao_gotejando) || 0;
+            else if (intNorm === "baixo") taxaBaseHora = Number(param.vazao_baixo) || 0;
+            else if (intNorm === "médio" || intNorm === "medio") taxaBaseHora = Number(param.vazao_medio) || 0;
+            else if (intNorm === "alto") taxaBaseHora = Number(param.vazao_alto) || 0;
+            else taxaBaseHora = Number(param.vazao_baixo) || 0;
+            origem = `Estimativa conservadora (${item.intensidade || "Baixo"})`;
+        }
+        isMedido = false;
+    }
+
+    const custoHora = taxaBaseHora * (Number(param.custo_unitario) || 0);
+    const perdaTotal = custoHora * horas;
+
+    return {
+        perdaTotal,
+        perdaFormatada: formatarMoedaBRL(perdaTotal),
+        tempoFormatado,
+        origem,
+        isMedido,
+        horas,
+        custoHora
+    };
+}
+
+function atualizarOpcoesUnidadeVazao(substancia) {
+    const selUnidade = document.getElementById("vazaoUnidade");
+    if (!selUnidade) return;
+
+    selUnidade.innerHTML = "";
+    let opcoes = [];
+
+    if (substancia === "Vapor") {
+        opcoes = [
+            { value: "kg/h", label: "kg/h (Quilos por hora)" },
+            { value: "t/h", label: "t/h (Toneladas por hora)" },
+            { value: "g/min", label: "g/min (Gramas por minuto)" }
+        ];
+    } else if (substancia === "Ar de Serviço / Ar de Instrumento") {
+        opcoes = [
+            { value: "Nm³/h", label: "Nm³/h (Metros cúbicos normais/h)" },
+            { value: "m³/h", label: "m³/h (Metros cúbicos/h)" },
+            { value: "L/min", label: "L/min (Litros por minuto)" }
+        ];
+    } else {
+        opcoes = [
+            { value: "ml/min", label: "ml/min (Mililitros por minuto)" },
+            { value: "L/min", label: "L/min (Litros por minuto)" },
+            { value: "L/h", label: "L/h (Litros por hora)" },
+            { value: "m³/h", label: "m³/h (Metros cúbicos por hora)" }
+        ];
+    }
+
+    opcoes.forEach(op => {
+        const opt = document.createElement("option");
+        opt.value = op.value;
+        opt.textContent = op.label;
+        selUnidade.appendChild(opt);
+    });
+}
+
+function verificarMensuracao() {
+    const sel = document.getElementById("mensuravelVazamento");
+    const box = document.getElementById("camposMensuracao");
+    if (!sel || !box) return;
+
+    if (sel.value === "Sim") {
+        box.classList.remove("hidden");
+    } else {
+        box.classList.add("hidden");
+    }
+}
 
 
 // Navegação entre ecrãs
-function mostrarTela(idTela) {
+async function mostrarTela(idTela) {
     document.querySelectorAll('.screen').forEach(tela => tela.classList.remove('active'));
     document.getElementById(idTela).classList.add('active');
     
@@ -2018,10 +2522,12 @@ function mostrarTela(idTela) {
         carregarResumo();
     }
     if (idTela === 'consulta') {
+        await carregarParametrosCustos();
         atualizarSubAreasConsulta();
         carregarFiltrosData();
     }
     if (idTela === 'manutencao') {
+        await carregarParametrosCustos();
         atualizarSubAreasManutencao();
         carregarPainelManutencao();
     }
@@ -2029,7 +2535,7 @@ function mostrarTela(idTela) {
 
 // Limpa todos os campos da tela de registro caso o usuário clique em voltar ou mude de tela
 function limparFormularioRegistro() {
-    const camposTexto = ["matricula", "nome", "nomeEmpresa", "identificacao", "produtoQuimico", "outraSubstancia", "observacao"];
+    const camposTexto = ["matricula", "nome", "nomeEmpresa", "identificacao", "produtoQuimico", "outraSubstancia", "notaManutencaoRegistro", "observacao"];
     camposTexto.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -2126,6 +2632,13 @@ function limparTelaConsulta() {
 
     const boxHist = document.getElementById("historicoOcorrencia");
     if (boxHist) boxHist.innerHTML = '<div class="empty-message">Nenhuma atualização registrada.</div>';
+
+    const selMens = document.getElementById("mensuravelVazamento");
+    if (selMens) selMens.value = "";
+    const inpVazao = document.getElementById("vazaoValor");
+    if (inpVazao) inpVazao.value = "";
+    const boxMens = document.getElementById("camposMensuracao");
+    if (boxMens) boxMens.classList.add("hidden");
 
     const boxFoto = document.getElementById("consultaFotoContainer");
     const imgFoto = document.getElementById("consultaFoto");
@@ -2458,6 +2971,7 @@ async function registrarOcorrencia() {
     const substancia = document.getElementById("substancia").value;
     const intensidade = document.getElementById("intensidade").value;
     const condicaoIntervencao = document.getElementById("condicaoIntervencao") ? document.getElementById("condicaoIntervencao").value : null;
+    const notaManutencaoReg = document.getElementById("notaManutencaoRegistro") ? document.getElementById("notaManutencaoRegistro").value.trim() : null;
     const observacao = document.getElementById("observacao") ? document.getElementById("observacao").value.trim() : "";
 
     if (!matricula || !nome || !empresa || !area || !localVazamento || !substancia || !intensidade) {
@@ -2518,6 +3032,7 @@ async function registrarOcorrencia() {
             intensidade: intensidade,
             condicao_intervencao: condicaoIntervencao,
             observacao: observacao,
+            nota_manutencao: notaManutencaoReg,
             foto: fotoBase64 || null,
             status: "Aberto",
             data_hora: agoraIso,
@@ -2655,11 +3170,13 @@ async function buscarPorNotificador() {
         return;
     }
 
+    resultadosNotificadorCache = resultados;
     boxResultados.classList.remove("hidden");
     qtdResultados.textContent = `${resultados.length} ocorrência(s) encontrada(s):`;
 
     resultados.forEach(item => {
         const dataFormatada = item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "-";
+        const calc = calcularPerdaOcorrencia(item);
         const div = document.createElement("div");
         div.className = "result-item";
         div.innerHTML = `
@@ -2675,15 +3192,28 @@ async function buscarPorNotificador() {
                 <div><strong>Substância:</strong> ${item.substancia || '-'}</div>
                 <div><strong>TAG:</strong> ${item.identificacao_tag || '-'}</div>
             </div>
-            <button type="button" class="btn-secondary" style="font-size:12px;padding:6px 10px;" onclick='abrirDetalheOcorrencia(${JSON.stringify(item)})'>Ver Detalhes</button>
+            <div style="margin-bottom:10px;">
+                <span class="financial-tag ${calc.isMedido ? 'measured' : ''}">
+                    💰 Perda est.: ${calc.perdaFormatada} (${calc.tempoFormatado}) • ${calc.origem}
+                </span>
+            </div>
+            <button type="button" class="btn-secondary" style="font-size:12px;padding:6px 10px;" onclick="abrirDetalhePorNumero(${item.numero})">Ver Detalhes</button>
         `;
         containerLista.appendChild(div);
     });
 }
 
+function abrirDetalhePorNumero(numero) {
+    const item = resultadosNotificadorCache.find(x => String(x.numero) === String(numero));
+    if (item) {
+        abrirDetalheOcorrencia(item);
+    }
+}
+
 function abrirDetalheOcorrencia(dados) {
-    preencherDadosConsulta(dados);
+    // Esconde a lista de pesquisa antes para que o cálculo da rolagem seja exato
     document.getElementById("resultadosNotificador").classList.add("hidden");
+    preencherDadosConsulta(dados);
 }
 
 // Função para normalizar e corrigir Data URL da foto
@@ -2715,6 +3245,43 @@ function preencherDadosConsulta(dados) {
     document.getElementById("consultaIntensidade").textContent = dados.intensidade || "-";
     document.getElementById("consultaCondicao").textContent = dados.condicao_intervencao || "-";
     document.getElementById("consultaStatus").textContent = dados.status || "-";
+
+    // Atualiza o indicador financeiro da ocorrência
+    const calc = calcularPerdaOcorrencia(dados);
+    const elTempo = document.getElementById("consultaTempoDecorrido");
+    const elPerda = document.getElementById("consultaPerdaFinanceira");
+    const elBase = document.getElementById("consultaBaseCalculo");
+    if (elTempo) elTempo.textContent = calc.tempoFormatado;
+    if (elPerda) elPerda.textContent = calc.perdaFormatada;
+    if (elBase) {
+        const statusEncerrado = (dados.status === "Concluído" || dados.status === "Cancelado");
+        elBase.innerHTML = `<strong>Base de cálculo:</strong> ${calc.origem} (${formatarMoedaBRL(calc.custoHora)}/h) • <em>${statusEncerrado ? "Contagem encerrada" : "Contagem ativa em tempo real"}</em>`;
+    }
+
+    // Prepara os campos de medição na seção Atualizar Ocorrência
+    atualizarOpcoesUnidadeVazao(dados.substancia);
+    const selMens = document.getElementById("mensuravelVazamento");
+    const boxMens = document.getElementById("camposMensuracao");
+    const selUnid = document.getElementById("vazaoUnidade");
+    const inpVal = document.getElementById("vazaoValor");
+
+    if (selMens && boxMens) {
+        if (dados.mensuravel === "Sim") {
+            selMens.value = "Sim";
+            boxMens.classList.remove("hidden");
+            if (selUnid && dados.vazao_unidade) selUnid.value = dados.vazao_unidade;
+            if (inpVal && dados.vazao_valor) inpVal.value = dados.vazao_valor;
+        } else if (dados.mensuravel === "Não") {
+            selMens.value = "Não";
+            boxMens.classList.add("hidden");
+            if (inpVal) inpVal.value = "";
+        } else {
+            selMens.value = "";
+            boxMens.classList.add("hidden");
+            if (inpVal) inpVal.value = "";
+        }
+    }
+
     const elObs = document.getElementById("consultaObservacao");
     if (elObs) {
         elObs.style.whiteSpace = "pre-wrap";
@@ -2744,8 +3311,17 @@ function preencherDadosConsulta(dados) {
 
     renderizarHistoricoOcorrencia(dados.observacao);
 
-    document.getElementById("resultadoConsulta").classList.remove("hidden");
-    document.getElementById("resultadoConsulta").scrollIntoView({ behavior: 'smooth' });
+    const boxResultado = document.getElementById("resultadoConsulta");
+    boxResultado.classList.remove("hidden");
+    
+    // Pequeno atraso para garantir que a renderização do DOM (como esconder a lista) 
+    // termine antes de calcular a posição para rolagem suave.
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            const topo = boxResultado.getBoundingClientRect().top + window.pageYOffset - 20;
+            window.scrollTo({ top: Math.max(0, topo), behavior: "smooth" });
+        }, 50);
+    });
 }
 
 function limparFiltros() {
@@ -2782,9 +3358,18 @@ async function atualizarStatus() {
     const descricao = document.getElementById("descricaoAtualizacao").value.trim();
     const nota = document.getElementById("notaManutencao").value.trim();
     const confirmacaoConclusao = document.getElementById("confirmacaoConclusaoSelect").value;
+    const mensuravel = document.getElementById("mensuravelVazamento") ? document.getElementById("mensuravelVazamento").value : "";
+    const vazaoUnidade = document.getElementById("vazaoUnidade") ? document.getElementById("vazaoUnidade").value : "";
+    const vazaoValorStr = document.getElementById("vazaoValor") ? document.getElementById("vazaoValor").value.trim() : "";
+    const vazaoValor = parseFloat(vazaoValorStr);
 
     if (!matricula || !descricao) {
         alert("Por favor, preencha a sua matrícula e a descrição da ação/atualização.");
+        return;
+    }
+
+    if (mensuravel === "Sim" && (!vazaoUnidade || isNaN(vazaoValor) || vazaoValor <= 0)) {
+        alert("Como o vazamento pode ser mensurado, informe a unidade de medida e um valor numérico válido maior que zero.");
         return;
     }
 
@@ -2803,8 +3388,15 @@ async function atualizarStatus() {
         const agoraIso = new Date().toISOString();
         const dataHoraFormatada = new Date().toLocaleString("pt-BR");
 
+        let infoMedicao = "";
+        if (mensuravel === "Sim") {
+            infoMedicao = ` | Medição: ${vazaoValor} ${vazaoUnidade}`;
+        } else if (mensuravel === "Não") {
+            infoMedicao = " | Não mensurável";
+        }
+
         // Formata a linha de atualização com data, novo status, matrícula e o texto da ação
-        const linhaHistorico = `[${dataHoraFormatada} - ${novoStatus} (${matricula})]: ${descricao}`;
+        const linhaHistorico = `[${dataHoraFormatada} - ${novoStatus} (${matricula})${infoMedicao}]: ${descricao}`;
 
         // Concatena com as observações anteriores sem apagar o que já existia
         const obsAtual = (ocorrenciaAtual.observacao && ocorrenciaAtual.observacao !== "-" && ocorrenciaAtual.observacao !== "Nenhuma observação registrada.")
@@ -2826,10 +3418,36 @@ async function atualizarStatus() {
             dadosAtualizacao.confirmacao_eliminacao = "Sim";
         }
 
-        const { error } = await supabaseClient
+        if (mensuravel === "Sim") {
+            dadosAtualizacao.mensuravel = "Sim";
+            dadosAtualizacao.vazao_unidade = vazaoUnidade;
+            dadosAtualizacao.vazao_valor = vazaoValor;
+        } else if (mensuravel === "Não") {
+            dadosAtualizacao.mensuravel = "Não";
+            dadosAtualizacao.vazao_unidade = null;
+            dadosAtualizacao.vazao_valor = null;
+        }
+
+        let { error } = await supabaseClient
             .from("ocorrencias")
             .update(dadosAtualizacao)
             .eq("numero", ocorrenciaAtual.numero);
+
+        // Fallback seguro caso as colunas de medição ainda não tenham sido criadas no Supabase
+        if (error && error.message && (error.message.includes("mensuravel") || error.message.includes("vazao_"))) {
+            const dadosSemMedicao = { ...dadosAtualizacao };
+            delete dadosSemMedicao.mensuravel;
+            delete dadosSemMedicao.vazao_unidade;
+            delete dadosSemMedicao.vazao_valor;
+            const retry = await supabaseClient
+                .from("ocorrencias")
+                .update(dadosSemMedicao)
+                .eq("numero", ocorrenciaAtual.numero);
+            error = retry.error;
+            if (!error) {
+                alert("Aviso: O status foi atualizado, mas para gravar os campos de vazão separadamente execute o comando SQL de criação das colunas no Supabase.");
+            }
+        }
 
         if (error) {
             console.error("Erro ao atualizar ocorrência:", error);
@@ -2844,7 +3462,29 @@ async function atualizarStatus() {
         // Atualizar objeto local em tela
         ocorrenciaAtual.status = novoStatus;
         ocorrenciaAtual.observacao = novaObservacao;
+        ocorrenciaAtual.atualizado_em = agoraIso;
         if (nota) ocorrenciaAtual.nota_manutencao = nota;
+        if (mensuravel === "Sim") {
+            ocorrenciaAtual.mensuravel = "Sim";
+            ocorrenciaAtual.vazao_unidade = vazaoUnidade;
+            ocorrenciaAtual.vazao_valor = vazaoValor;
+        } else if (mensuravel === "Não") {
+            ocorrenciaAtual.mensuravel = "Não";
+            ocorrenciaAtual.vazao_unidade = null;
+            ocorrenciaAtual.vazao_valor = null;
+        }
+
+        // Recalcular indicador financeiro em tela
+        const calcAtualizado = calcularPerdaOcorrencia(ocorrenciaAtual);
+        const elTempo = document.getElementById("consultaTempoDecorrido");
+        const elPerda = document.getElementById("consultaPerdaFinanceira");
+        const elBase = document.getElementById("consultaBaseCalculo");
+        if (elTempo) elTempo.textContent = calcAtualizado.tempoFormatado;
+        if (elPerda) elPerda.textContent = calcAtualizado.perdaFormatada;
+        if (elBase) {
+            const statusEncerrado = (novoStatus === "Concluído" || novoStatus === "Cancelado");
+            elBase.innerHTML = `<strong>Base de cálculo:</strong> ${calcAtualizado.origem} (${formatarMoedaBRL(calcAtualizado.custoHora)}/h) • <em>${statusEncerrado ? "Contagem encerrada" : "Contagem ativa em tempo real"}</em>`;
+        }
 
         document.getElementById("consultaStatus").textContent = novoStatus;
         const elObs = document.getElementById("consultaObservacao");
@@ -3140,11 +3780,14 @@ function atualizarContadoresManutencao(lista) {
     let emAnalise = 0;
     let programados = 0;
     let emExecucao = 0;
+    let perdaPendentesTotal = 0;
 
     lista.forEach(item => {
         const st = (item.status || "Aberto").trim();
         if (st !== "Concluído" && st !== "Cancelado") {
             pendentes++;
+            const calc = calcularPerdaOcorrencia(item);
+            perdaPendentesTotal += calc.perdaTotal;
         }
         if (st === "Em Análise") emAnalise++;
         if (st === "Programado") programados++;
@@ -3155,11 +3798,13 @@ function atualizarContadoresManutencao(lista) {
     const elAnal = document.getElementById("manutencaoEmAnalise");
     const elProg = document.getElementById("manutencaoProgramado");
     const elExec = document.getElementById("manutencaoEmExecucao");
+    const elPerda = document.getElementById("manutencaoPerdaTotal");
 
     if (elPend) elPend.textContent = pendentes;
     if (elAnal) elAnal.textContent = emAnalise;
     if (elProg) elProg.textContent = programados;
     if (elExec) elExec.textContent = emExecucao;
+    if (elPerda) elPerda.textContent = formatarMoedaBRL(perdaPendentesTotal);
 }
 
 function renderizarListaManutencao() {
@@ -3169,8 +3814,9 @@ function renderizarListaManutencao() {
     const filtroArea = document.getElementById("filtroManutencaoArea") ? document.getElementById("filtroManutencaoArea").value : "";
     const filtroLocal = document.getElementById("filtroManutencaoLocal") ? document.getElementById("filtroManutencaoLocal").value : "";
     const filtroStatus = document.getElementById("filtroManutencaoStatus") ? document.getElementById("filtroManutencaoStatus").value : "";
+    const ordenacao = document.getElementById("filtroManutencaoOrdenacao") ? document.getElementById("filtroManutencaoOrdenacao").value : "recentes";
 
-    let filtradas = todasOcorrenciasManutencao;
+    let filtradas = [...todasOcorrenciasManutencao];
 
     // Filtro de Pendentes vs Todas
     if (filtroApenasPendentes && !filtroStatus) {
@@ -3195,6 +3841,13 @@ function renderizarListaManutencao() {
         filtradas = filtradas.filter(item => (item.status || "Aberto") === filtroStatus);
     }
 
+    // Ordenação por Maior Perda Estimada ou Mais Recentes
+    if (ordenacao === "maior_perda") {
+        filtradas.sort((a, b) => calcularPerdaOcorrencia(b).perdaTotal - calcularPerdaOcorrencia(a).perdaTotal);
+    } else {
+        filtradas.sort((a, b) => Number(b.numero) - Number(a.numero));
+    }
+
     if (filtradas.length === 0) {
         container.innerHTML = '<div class="empty-message">Nenhuma ocorrência encontrada para os filtros selecionados.</div>';
         return;
@@ -3205,6 +3858,7 @@ function renderizarListaManutencao() {
     filtradas.forEach(item => {
         const dataFormatada = item.data_hora ? new Date(item.data_hora).toLocaleString("pt-BR") : "-";
         const statusClasse = (item.status || "aberto").toLowerCase().replace(/\s+/g, "");
+        const calc = calcularPerdaOcorrencia(item);
         const div = document.createElement("div");
         div.className = "maintenance-item";
 
@@ -3223,10 +3877,15 @@ function renderizarListaManutencao() {
                 <div><strong>Notificador:</strong> ${item.nome || "-"} (${item.matricula || "-"})</div>
                 <div><strong>Data do Registro:</strong> ${dataFormatada}</div>
             </div>
+            <div style="margin-bottom:10px;">
+                <span class="financial-tag ${calc.isMedido ? 'measured' : ''}">
+                    💰 Perda est.: ${calc.perdaFormatada} (${calc.tempoFormatado}) • ${calc.origem}
+                </span>
+            </div>
             ${item.observacao ? `<div style="font-size:13px; color:#555; margin-bottom:8px;"><strong>Observação:</strong> ${item.observacao}</div>` : ""}
             ${item.nota_manutencao ? `<div class="maintenance-note"><strong>Nota de Manutenção:</strong> ${item.nota_manutencao}</div>` : ""}
             <div style="margin-top:12px; display:flex; gap:8px;">
-                <button type="button" class="btn-primary" style="font-size:13px; padding:8px 14px; width:auto;" onclick='tratarOcorrenciaManutencao(${JSON.stringify(item)})'>
+                <button type="button" class="btn-primary" style="font-size:13px; padding:8px 14px; width:auto;" onclick="tratarOcorrenciaManutencao(${item.numero})">
                     🛠️ Ver / Tratar Ocorrência
                 </button>
             </div>
@@ -3236,9 +3895,157 @@ function renderizarListaManutencao() {
     });
 }
 
-function tratarOcorrenciaManutencao(item) {
-    mostrarTela('consulta');
-    preencherDadosConsulta(item);
+async function tratarOcorrenciaManutencao(numero) {
+    const item = todasOcorrenciasManutencao.find(x => String(x.numero) === String(numero));
+    if (item) {
+        await mostrarTela('consulta');
+        preencherDadosConsulta(item);
+    }
+}
+
+// --- MODAL TABELA DE CUSTOS (SENHA: Suzano) ---
+function abrirModalCustos() {
+    const modal = document.getElementById("modalTabelaCustos");
+    const loginBox = document.getElementById("custosLoginBox");
+    const editorBox = document.getElementById("custosEditorBox");
+    const erroBox = document.getElementById("erroSenhaCustos");
+    const inpSenha = document.getElementById("senhaTabelaCustos");
+    const msgSalvar = document.getElementById("msgSalvarCustos");
+
+    if (!modal) return;
+    if (erroBox) erroBox.classList.add("hidden");
+    if (msgSalvar) msgSalvar.classList.add("hidden");
+
+    if (tabelaCustosDesbloqueada) {
+        if (loginBox) loginBox.classList.add("hidden");
+        if (editorBox) editorBox.classList.remove("hidden");
+        renderizarTabelaParametrosCustos();
+    } else {
+        if (inpSenha) inpSenha.value = "";
+        if (loginBox) loginBox.classList.remove("hidden");
+        if (editorBox) editorBox.classList.add("hidden");
+    }
+
+    modal.classList.remove("hidden");
+    if (!tabelaCustosDesbloqueada && inpSenha) {
+        setTimeout(() => inpSenha.focus(), 100);
+    }
+}
+
+function fecharModalCustos() {
+    const modal = document.getElementById("modalTabelaCustos");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function validarSenhaCustos() {
+    const inpSenha = document.getElementById("senhaTabelaCustos");
+    const erroBox = document.getElementById("erroSenhaCustos");
+    const loginBox = document.getElementById("custosLoginBox");
+    const editorBox = document.getElementById("custosEditorBox");
+
+    const senhaDigitada = inpSenha ? inpSenha.value.trim() : "";
+    if (senhaDigitada === "Suzano") {
+        tabelaCustosDesbloqueada = true;
+        if (erroBox) erroBox.classList.add("hidden");
+        if (loginBox) loginBox.classList.add("hidden");
+        if (editorBox) editorBox.classList.remove("hidden");
+        await carregarParametrosCustos();
+        renderizarTabelaParametrosCustos();
+    } else {
+        if (erroBox) erroBox.classList.remove("hidden");
+    }
+}
+
+function renderizarTabelaParametrosCustos() {
+    const tbody = document.getElementById("tbodyParametrosCustos");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    PARAMETROS_CUSTOS_PADRAO.forEach((padrao, idx) => {
+        const atual = mapaParametrosCustos[padrao.substancia] || padrao;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><strong>${atual.substancia}</strong></td>
+            <td>${atual.unidade_base}</td>
+            <td><input type="number" step="0.01" min="0" class="cost-input" id="custo_unit_${idx}" value="${atual.custo_unitario}"></td>
+            <td><input type="number" step="0.0001" min="0" class="cost-input" id="vazao_got_${idx}" value="${atual.vazao_gotejando}"></td>
+            <td><input type="number" step="0.0001" min="0" class="cost-input" id="vazao_bai_${idx}" value="${atual.vazao_baixo}"></td>
+            <td><input type="number" step="0.0001" min="0" class="cost-input" id="vazao_med_${idx}" value="${atual.vazao_medio}"></td>
+            <td><input type="number" step="0.0001" min="0" class="cost-input" id="vazao_alt_${idx}" value="${atual.vazao_alto}"></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function restaurarPadraoConservador() {
+    if (!confirm("Deseja preencher a tabela com os valores padrão conservadores? Clique em 'Salvar Parâmetros' em seguida para gravar no banco.")) return;
+    PARAMETROS_CUSTOS_PADRAO.forEach(p => {
+        mapaParametrosCustos[p.substancia] = { ...p };
+    });
+    renderizarTabelaParametrosCustos();
+}
+
+async function salvarParametrosCustos() {
+    const btn = document.getElementById("btnSalvarParametrosCustos");
+    const msgBox = document.getElementById("msgSalvarCustos");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Salvando...";
+    }
+
+    try {
+        const agoraIso = new Date().toISOString();
+        const registros = PARAMETROS_CUSTOS_PADRAO.map((padrao, idx) => {
+            const custoUnit = parseFloat(document.getElementById(`custo_unit_${idx}`).value) || 0;
+            const vazaoGot = parseFloat(document.getElementById(`vazao_got_${idx}`).value) || 0;
+            const vazaoBai = parseFloat(document.getElementById(`vazao_bai_${idx}`).value) || 0;
+            const vazaoMed = parseFloat(document.getElementById(`vazao_med_${idx}`).value) || 0;
+            const vazaoAlt = parseFloat(document.getElementById(`vazao_alt_${idx}`).value) || 0;
+
+            const obj = {
+                substancia: padrao.substancia,
+                unidade_base: padrao.unidade_base,
+                custo_unitario: custoUnit,
+                vazao_gotejando: vazaoGot,
+                vazao_baixo: vazaoBai,
+                vazao_medio: vazaoMed,
+                vazao_alto: vazaoAlt,
+                atualizado_em: agoraIso
+            };
+            mapaParametrosCustos[padrao.substancia] = { ...obj };
+            return obj;
+        });
+
+        const { error } = await supabaseClient
+            .from("parametros_custos")
+            .upsert(registros, { onConflict: "substancia" });
+
+        if (msgBox) {
+            msgBox.classList.remove("hidden");
+            if (error) {
+                msgBox.style.background = "#fff3cd";
+                msgBox.style.color = "#856404";
+                msgBox.textContent = "Os valores foram aplicados nesta sessão, mas para salvar permanentemente no banco crie a tabela 'parametros_custos' no Supabase (" + error.message + ").";
+            } else {
+                msgBox.style.background = "#dcfce7";
+                msgBox.style.color = "#166534";
+                msgBox.textContent = "✓ Parâmetros salvos com sucesso no Supabase! Os cálculos já foram atualizados.";
+            }
+        }
+
+        // Atualiza os contadores e cartões da tela de manutenção em tempo real
+        atualizarContadoresManutencao(todasOcorrenciasManutencao);
+        renderizarListaManutencao();
+
+    } catch (err) {
+        console.error("Erro ao salvar parâmetros:", err);
+        alert("Falha ao salvar parâmetros: " + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "💾 Salvar Parâmetros";
+        }
+    }
 }
 
 function atualizarPainelManutencao() {
@@ -3340,6 +4147,12 @@ async function exportarParaExcel() {
             "Intensidade": item.intensidade || "",
             "Condição de Intervenção": item.condicao_intervencao || "",
             "Status": item.status || "Aberto",
+            "Mensurável": item.mensuravel || "Não informado",
+            "Vazão Medida": item.vazao_valor || "",
+            "Unidade da Vazão": item.vazao_unidade || "",
+            "Tempo Decorrido (h)": Number(calcularPerdaOcorrencia(item).horas.toFixed(2)),
+            "Base de Cálculo": calcularPerdaOcorrencia(item).origem,
+            "Perda Estimada (R$)": Number(calcularPerdaOcorrencia(item).perdaTotal.toFixed(2)),
             "Observação": item.observacao || "",
             "Nota de Manutenção": item.nota_manutencao || "",
             "Última Atualização": item.atualizado_em ? new Date(item.atualizado_em).toLocaleString("pt-BR") : "",
@@ -3375,11 +4188,124 @@ async function exportarParaExcel() {
 
 
 // Inicialização automática ao carregar a página
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+    await carregarParametrosCustos();
     carregarFiltrosData();
     carregarResumo();
 });
 
+
+// --- EDICAO RAPIDA DA OCORRENCIA ---
+function abrirModalEdicaoOcorrencia() {
+    if (!ocorrenciaAtual) return;
+    
+    // Bloqueia edição se estiver cancelada ou concluída (opcional, mas recomendado)
+    if (ocorrenciaAtual.status === "Cancelado") {
+        alert("Ocorrências canceladas não podem ser editadas.");
+        return;
+    }
+
+    document.getElementById("edicaoIntensidade").value = ocorrenciaAtual.intensidade || "Baixo";
+    document.getElementById("edicaoCondicao").value = ocorrenciaAtual.condicao_intervencao || "Não informado";
+    document.getElementById("edicaoNota").value = ocorrenciaAtual.nota_manutencao || "";
+    document.getElementById("edicaoMatricula").value = "";
+
+    document.getElementById("modalEdicaoOcorrencia").classList.remove("hidden");
+}
+
+function fecharModalEdicaoOcorrencia() {
+    document.getElementById("modalEdicaoOcorrencia").classList.add("hidden");
+}
+
+async function salvarEdicaoOcorrencia() {
+    if (!ocorrenciaAtual) return;
+
+    const nIntensidade = document.getElementById("edicaoIntensidade").value;
+    const nCondicao = document.getElementById("edicaoCondicao").value;
+    const nNota = document.getElementById("edicaoNota").value.trim();
+    const matricula = document.getElementById("edicaoMatricula").value.trim();
+
+    if (!matricula) {
+        alert("Por favor, informe a matrícula de quem está realizando a alteração.");
+        return;
+    }
+
+    const btn = document.getElementById("btnSalvarEdicao");
+    btn.disabled = true;
+    btn.textContent = "Salvando...";
+
+    try {
+        const agoraIso = new Date().toISOString();
+        const dataHoraFormatada = new Date().toLocaleString("pt-BR");
+        
+        let textoHistorico = `[${dataHoraFormatada} - Edição (${matricula})]: Dados atualizados - Intensidade: ${nIntensidade}, Condição: ${nCondicao}`;
+        if (nNota) textoHistorico += `, Nota: ${nNota}`;
+
+        const obsAtual = (ocorrenciaAtual.observacao && ocorrenciaAtual.observacao !== "-" && ocorrenciaAtual.observacao !== "Nenhuma observação registrada.")
+            ? ocorrenciaAtual.observacao.trim()
+            : "";
+        const novaObservacao = obsAtual ? `${obsAtual}\n\n${textoHistorico}` : textoHistorico;
+
+        const dadosEdicao = {
+            intensidade: nIntensidade,
+            condicao_intervencao: nCondicao,
+            nota_manutencao: nNota || null,
+            observacao: novaObservacao,
+            atualizado_em: agoraIso
+        };
+
+        const { error } = await supabaseClient
+            .from("ocorrencias")
+            .update(dadosEdicao)
+            .eq("numero", ocorrenciaAtual.numero);
+
+        if (error) {
+            console.error("Erro ao salvar edição:", error);
+            alert("Erro do Supabase: " + error.message);
+            btn.disabled = false;
+            btn.textContent = "💾 Salvar Alterações";
+            return;
+        }
+
+        // Atualiza os dados em memória e em tela
+        ocorrenciaAtual.intensidade = nIntensidade;
+        ocorrenciaAtual.condicao_intervencao = nCondicao;
+        ocorrenciaAtual.nota_manutencao = nNota || null;
+        ocorrenciaAtual.observacao = novaObservacao;
+        ocorrenciaAtual.atualizado_em = agoraIso;
+
+        document.getElementById("consultaIntensidade").textContent = nIntensidade;
+        document.getElementById("consultaCondicao").textContent = nCondicao;
+        document.getElementById("consultaNotaManutencao").textContent = nNota || "Nenhuma nota de manutenção registrada.";
+
+        const elObs = document.getElementById("consultaObservacao");
+        if (elObs) elObs.textContent = novaObservacao;
+        
+        renderizarHistoricoOcorrencia(novaObservacao);
+
+        // Recalcular finanças
+        const calc = calcularPerdaOcorrencia(ocorrenciaAtual);
+        const elTempo = document.getElementById("consultaTempoDecorrido");
+        const elPerda = document.getElementById("consultaPerdaFinanceira");
+        const elBase = document.getElementById("consultaBaseCalculo");
+        if (elTempo) elTempo.textContent = calc.tempoFormatado;
+        if (elPerda) elPerda.textContent = calc.perdaFormatada;
+        if (elBase) {
+            const statusEncerrado = (ocorrenciaAtual.status === "Concluído" || ocorrenciaAtual.status === "Cancelado");
+            elBase.innerHTML = `<strong>Base de cálculo:</strong> ${calc.origem} (${formatarMoedaBRL(calc.custoHora)}/h) • <em>${statusEncerrado ? "Contagem encerrada" : "Contagem ativa em tempo real"}</em>`;
+        }
+        
+        fecharModalEdicaoOcorrencia();
+        alert("Ocorrência atualizada com sucesso!");
+
+    } catch (err) {
+        console.error("Erro na edição:", err);
+        alert("Falha inesperada: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "💾 Salvar Alterações";
+    }
+}
 </script>
 </body>
 </html>
